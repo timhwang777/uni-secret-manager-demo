@@ -1,0 +1,21 @@
+# Prod profile: GCP primary, AWS secondary, strict mode
+secrets:
+  provider-order:
+    - gcp
+    - aws
+  fail-on-missing: true
+
+  gcp:
+    enabled: true
+    project-id: ${GCP_PROJECT_ID}
+
+  aws:
+    enabled: true
+    region: ${AWS_REGION:us-east-1}
+
+  local:
+    enabled: false
+
+  cache:
+    ttl: 10m
+    max-size: 5000

@@ -1,0 +1,27 @@
+# Staging profile: GCP primary, AWS (LocalStack) secondary, local fallback
+secrets:
+  provider-order:
+    - gcp
+    - aws
+    - local
+  fail-on-missing: true
+
+  gcp:
+    enabled: true
+    # Set GCP_PROJECT_ID env var or override here
+    project-id: ${GCP_PROJECT_ID:}
+
+  aws:
+    enabled: true
+    region: us-east-1
+    endpoint: http://localhost:4566  # LocalStack
+
+  local:
+    enabled: true
+    secrets:
+      rotating-secret: "staging-rotating-value"
+      nested-config: '{"database":{"connection":{"host":"staging-db.local","password":"staging-nested-pass","port":5432}},"cache":{"redis":{"host":"staging-redis.local","port":6379}}}'
+      optional-feature: "disabled-in-staging"
+
+  cache:
+    ttl: 3m

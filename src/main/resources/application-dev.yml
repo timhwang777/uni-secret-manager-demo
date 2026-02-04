@@ -1,0 +1,20 @@
+# Dev profile: local provider only, no cloud credentials needed
+secrets:
+  provider-order:
+    - local
+  fail-on-missing: false
+
+  local:
+    enabled: true
+    secrets:
+      db-credentials: '{"username":"dev-admin","password":"dev-password","host":"localhost","port":5432}'
+      api-key: "dev-api-key-local"
+      gcp-api-key: "dev-gcp-api-key-local"
+      shared-secret: "shared-value-from-local"
+      rotating-secret: "dev-rotating-value"
+      nested-config: '{"database":{"connection":{"host":"localhost","password":"dev-nested-pass","port":5432}},"cache":{"redis":{"host":"localhost","port":6379}}}'
+      optional-feature: "enabled-in-dev"
+
+logging:
+  level:
+    io.github.timhwang777.unisecret: DEBUG

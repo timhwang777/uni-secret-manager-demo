@@ -1,0 +1,32 @@
+# Cloud test configuration: real GCP + local fallback
+secrets:
+  enabled: true
+  provider-order:
+    - gcp
+    - local
+  fail-on-missing: true
+
+  gcp:
+    enabled: true
+    project-id: ${GCP_PROJECT_ID:}
+
+  local:
+    enabled: true
+    secrets:
+      optional-feature: "enabled-in-cloud-test"
+      rotating-secret: "cloud-test-rotating-value"
+
+  cache:
+    enabled: true
+    ttl: 1m
+    max-size: 100
+
+  retry:
+    max-attempts: 3
+    initial-delay: 500ms
+    multiplier: 2.0
+    max-delay: 5s
+
+logging:
+  level:
+    io.github.timhwang777.unisecret: DEBUG

@@ -1,0 +1,33 @@
+# Test configuration: local provider only, fast cache, no cloud dependencies
+secrets:
+  enabled: true
+  provider-order:
+    - local
+  fail-on-missing: false
+
+  local:
+    enabled: true
+    secrets:
+      db-credentials: '{"username":"test-admin","password":"test-password","host":"test-db.local","port":5432}'
+      api-key: "test-api-key-12345"
+      gcp-api-key: "test-gcp-api-key-12345"
+      shared-secret: "shared-value-from-local"
+      rotating-secret: "test-rotating-value"
+      nested-config: '{"database":{"connection":{"host":"test-db.local","password":"test-nested-pass","port":5432}},"cache":{"redis":{"host":"test-redis.local","port":6379}}}'
+      optional-feature: "enabled-in-test"
+
+  cache:
+    enabled: true
+    ttl: 1m
+    max-size: 100
+
+  retry:
+    max-attempts: 2
+    initial-delay: 100ms
+    multiplier: 2.0
+    max-delay: 500ms
+
+logging:
+  level:
+    io.github.timhwang777.unisecret: DEBUG
+    io.github.timhwang777.unisecretdemo: DEBUG
