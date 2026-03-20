@@ -1,4 +1,4 @@
-.PHONY: install-starter build check-gcp check-docker check-localstack test-offline test-local test-gcp test-cloud test-all run-dev run-staging docker-up docker-down gcp-setup gcp-cleanup
+.PHONY: install-starter build check-gcp check-docker check-localstack check-vault test-offline test-local test-gcp test-cloud test-all run-dev run-staging run-vault docker-up docker-up-vault docker-down gcp-setup gcp-cleanup
 
 # Install the uni-secret-manager-spring starter to local Maven repository (~/.m2)
 # Prerequisite: Clone the starter repo as a sibling directory
@@ -33,13 +33,27 @@ check-docker:
 # Used for run-staging (tests use Testcontainers which manages its own containers)
 check-localstack: check-docker
 	@echo "Starting LocalStack..."
-	@docker compose up -d
+	@docker compose up -d localstack
 	@echo "Waiting for LocalStack to be healthy..."
 	@until curl -s http://localhost:4566/_localstack/health 2>/dev/null | grep -q '"secretsmanager"'; do \
 		echo "  waiting for secretsmanager service..."; \
 		sleep 2; \
 	done
 	@echo "✓ LocalStack is ready"
+
+# Start Vault dev container via docker-compose, wait for health, and seed demo secrets
+# Used for run-vault profile (tests use Testcontainers which manages its own containers)
+check-vault: check-docker
+	@echo "Starting Vault dev container..."
+	@docker compose up -d vault
+	@echo "Waiting for Vault to be healthy..."
+	@until curl -fs http://localhost:8200/v1/sys/health > /dev/null 2>&1; do \
+		echo "  waiting for Vault service..."; \
+		sleep 2; \
+	done
+	@echo "Seeding Vault demo secrets..."
+	@./scripts/vault-seed.sh
+	@echo "✓ Vault is ready"
 
 # ============================================================================
 # Test Commands
@@ -52,25 +66,25 @@ check-localstack: check-docker
 test-offline:
 	mvn test -Plocal-tests -Dtest="LocalProviderDemoTest,FallbackChainDemoTest,JsonFieldExtractionDemoTest,DefaultValueDemoTest,FailOnMissingDemoTest,CacheRefreshDemoTest"
 
-# Level 2: Local tests with Docker (Tests 1-7)
+# Level 2: Local tests with Docker (Tests 1-8)
 # Requirements: Java 21 + Maven + Docker
-# Includes AwsProviderDemoTest which uses Testcontainers/LocalStack
+# Includes AwsProviderDemoTest and VaultProviderDemoTest (both use Testcontainers)
 test-local: check-docker
 	mvn test -Plocal-tests
 
-# Level 3: Cloud tests - GCP only (Tests 8-9)
+# Level 3: Cloud tests - GCP only (Tests 9-10)
 # Requirements: Java 21 + Maven + GCP credentials
 # No Docker needed - tests real GCP Secret Manager directly
 test-gcp: check-gcp
 	mvn test -Pcloud-tests -Dtest="GcpProviderDemoTest,GcpJsonFieldDemoTest"
 
-# Level 4: Cloud tests with Docker (Tests 10-11)
+# Level 4: Cloud tests with Docker (Tests 11-12)
 # Requirements: Java 21 + Maven + Docker + GCP credentials
 # Tests cross-provider fallback between real GCP and LocalStack AWS
 test-cloud: check-gcp check-docker
 	mvn test -Pcloud-tests -Dtest="GcpAwsFallbackDemoTest,FullStackDemoTest"
 
-# Level 5: Full test suite (Tests 1-11)
+# Level 5: Full test suite (Tests 1-12)
 # Requirements: Java 21 + Maven + Docker + GCP credentials
 # Runs all local and cloud tests
 test-all: check-gcp check-docker
@@ -93,6 +107,13 @@ run-dev:
 run-staging: check-gcp check-localstack
 	AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test mvn spring-boot:run -Dspring-boot.run.profiles=staging
 
+# Run with vault profile (Vault dev container + local fallback)
+# Requirements: Docker
+# Automatically starts/seeds Vault dev container before running
+# Note: Run "make docker-down" when done to stop Vault
+run-vault: check-vault
+	VAULT_TOKEN=dev-only-token mvn spring-boot:run -Dspring-boot.run.profiles=vault
+
 # ============================================================================
 # Docker Commands
 # ============================================================================
@@ -100,6 +121,10 @@ run-staging: check-gcp check-localstack
 # Start LocalStack manually (prefer using check-localstack for automated setup)
 docker-up:
 	docker compose up -d
+
+# Start only the Vault dev container
+docker-up-vault:
+	docker compose up -d vault
 
 # Stop LocalStack and clean up containers
 docker-down:

@@ -1,0 +1,28 @@
+# Vault demo profile: Vault dev container primary, local fallback for non-Vault demo keys.
+secrets:
+  provider-order:
+    - vault
+    - local
+  fail-on-missing: false
+
+  vault:
+    enabled: true
+    host: localhost
+    port: 8200
+    scheme: http
+    auth-method: TOKEN
+    token: ${VAULT_TOKEN:dev-only-token}
+    mount: secret
+    kv-version: 2
+
+  local:
+    enabled: true
+    secrets:
+      # Keep local fallback for non-Vault-specific sample services.
+      gcp-api-key: "vault-profile-local-fallback"
+      optional-feature: "enabled-via-local-fallback"
+      shared-secret: "shared-value-from-local-fallback"
+      nested-config: '{"database":{"connection":{"host":"fallback-db.local","password":"fallback-nested-pass","port":5432}},"cache":{"redis":{"host":"fallback-redis.local","port":6379}}}'
+
+  cache:
+    ttl: 2m

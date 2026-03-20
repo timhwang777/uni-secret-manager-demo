@@ -5,6 +5,7 @@ Production-level Spring Boot 3.2 demo app for validating `uni-secret-manager-spr
 - Local provider
 - GCP Secret Manager
 - AWS Secrets Manager (via LocalStack in tests/dev)
+- HashiCorp Vault (via Docker dev mode in tests/dev)
 
 The app exposes REST endpoints that show secret-resolution status without exposing raw secret values.
 
@@ -15,14 +16,14 @@ The app exposes REST endpoints that show secret-resolution status without exposi
 - Default values when secrets are missing
 - Provider ordering and fallback (`gcp -> aws -> local`)
 - Cache invalidation with `SecretRefreshService` and REST endpoints
-- Real GCP integration tests plus AWS LocalStack tests with Testcontainers
+- Real GCP integration tests plus Docker-based AWS/Vault tests with Testcontainers
 
 ## Tech Stack
 
 - Java 21
 - Spring Boot 3.2.1
 - Maven
-- JUnit 5 + Testcontainers (LocalStack)
+- JUnit 5 + Testcontainers (LocalStack + Vault)
 
 ## Project Layout
 
@@ -38,7 +39,8 @@ The app exposes REST endpoints that show secret-resolution status without exposi
 │   ├── application.yml
 │   ├── application-dev.yml
 │   ├── application-staging.yml
-│   └── application-prod.yml
+│   ├── application-prod.yml
+│   └── application-vault.yml
 ├── src/test/java/io/github/timhwang777/unisecretdemo
 │   ├── local/
 │   └── cloud/
@@ -55,7 +57,7 @@ The app exposes REST endpoints that show secret-resolution status without exposi
 
 - Java 21
 - Maven 3.8+
-- Docker Desktop (for LocalStack/Testcontainers flows)
+- Docker Desktop (for LocalStack/Vault/Testcontainers flows)
 - Optional for cloud tests/staging/prod:
   - `gcloud` CLI
   - GCP Application Default Credentials
@@ -111,6 +113,14 @@ export GCP_PROJECT_ID=atsquareone
 make run-staging
 ```
 
+### Vault profile (Vault dev container + local fallback)
+
+Requires Docker. `make run-vault` will start Vault dev mode, seed demo secrets, then boot Spring with `vault` profile.
+
+```bash
+make run-vault
+```
+
 ### Prod profile (GCP + AWS, strict mode)
 
 Local fallback is disabled and `fail-on-missing=true`.
@@ -127,6 +137,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=prod
 |---|---|---|---|
 | `dev` | `local` | `false` | All secrets come from `application-dev.yml` |
 | `staging` | `gcp, aws, local` | `true` | AWS endpoint points to LocalStack (`http://localhost:4566`) |
+| `vault` | `vault, local` | `false` | Vault points to local dev container (`http://localhost:8200`) |
 | `prod` | `gcp, aws` | `true` | Local provider disabled |
 
 Base config in `application.yml` enables secret caching and retry settings shared by all profiles.
@@ -147,6 +158,14 @@ Base config in `application.yml` enables secret caching and retry settings share
 - `gcp-api-key` (plain string)
 - `shared-secret` (plain string)
 - `nested-config` (nested JSON)
+
+### Secrets seeded for Vault dev (`scripts/vault-seed.sh`)
+
+- `db-credentials` (JSON object)
+- `api-key` (JSON object with `value` field)
+- `shared-secret` (JSON object with `value` field)
+- `rotating-secret` (multiple KV v2 versions)
+- `nested-config` (nested JSON object)
 
 ### Local fallback secrets in profile YAML
 
@@ -210,6 +229,7 @@ curl -s -X POST http://localhost:8080/api/secrets/refresh | jq
   "providers": {
     "aws": true,
     "gcp": true,
+    "vault": false,
     "local": true
   },
   "cache": {
@@ -224,7 +244,7 @@ curl -s -X POST http://localhost:8080/api/secrets/refresh | jq
 
 Tests are split by JUnit tags:
 
-- `@Tag("local")`: local/offline + LocalStack-only coverage
+- `@Tag("local")`: local/offline + Docker-backed provider coverage (AWS LocalStack + Vault)
 - `@Tag("cloud")`: real GCP coverage (some also use LocalStack)
 
 Cloud tests are guarded by `@EnabledIfEnvironmentVariable(named = "GCP_PROJECT_ID", matches = ".+")`.
@@ -258,6 +278,7 @@ Local tag (`@Tag("local")`):
 - `FailOnMissingDemoTest`
 - `CacheRefreshDemoTest`
 - `AwsProviderDemoTest` (Docker/Testcontainers required)
+- `VaultProviderDemoTest` (Docker/Testcontainers required)
 
 Cloud tag (`@Tag("cloud")`):
 
@@ -266,16 +287,20 @@ Cloud tag (`@Tag("cloud")`):
 - `GcpAwsFallbackDemoTest` (Docker + GCP)
 - `FullStackDemoTest` (Docker + GCP)
 
-## LocalStack and GCP Utilities
+## LocalStack, Vault, and GCP Utilities
 
-### LocalStack (manual)
+### LocalStack + Vault (manual)
 
 ```bash
 make docker-up
 make docker-down
 ```
 
-`docker-compose.yml` runs LocalStack with Secrets Manager and auto-seeds secrets using `scripts/localstack-init.sh`.
+`docker-compose.yml` runs LocalStack and Vault dev mode. Vault demo secrets can be seeded with:
+
+```bash
+./scripts/vault-seed.sh
+```
 
 ### GCP secret lifecycle scripts
 

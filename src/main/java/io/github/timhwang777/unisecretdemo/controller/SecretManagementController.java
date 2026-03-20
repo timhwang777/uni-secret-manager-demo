@@ -27,6 +27,7 @@ public class SecretManagementController {
         Map<String, Boolean> providers = new LinkedHashMap<>();
         providers.put("aws", properties.getAws().isEnabled());
         providers.put("gcp", properties.getGcp().isEnabled());
+        providers.put("vault", properties.getVault().isEnabled());
         providers.put("local", properties.getLocal().isEnabled());
         status.put("providers", providers);
 

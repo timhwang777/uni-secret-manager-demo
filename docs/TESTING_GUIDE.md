@@ -9,7 +9,7 @@ A detailed, beginner-friendly guide explaining every test in this project, what 
 1. [How Testing Works in This Project](#1-how-testing-works-in-this-project)
 2. [Test Inventory](#2-test-inventory)
 3. [Level 1 — Offline Tests (No Docker, No Cloud)](#3-level-1--offline-tests-no-docker-no-cloud)
-4. [Level 2 — Local Tests with Docker (LocalStack)](#4-level-2--local-tests-with-docker-localstack)
+4. [Level 2 — Local Tests with Docker (LocalStack + Vault)](#4-level-2--local-tests-with-docker-localstack--vault)
 5. [Level 3 — Cloud Tests (Real GCP Only)](#5-level-3--cloud-tests-real-gcp-only)
 6. [Level 4 — Cloud Tests with Docker (Real GCP + LocalStack)](#6-level-4--cloud-tests-with-docker-real-gcp--localstack)
 7. [Level 5 — Full Suite (Everything)](#7-level-5--full-suite-everything)
@@ -62,7 +62,7 @@ Some tests don't use either file — they set their own configuration entirely v
 
 ## 2. Test Inventory
 
-### Local Tier — `@Tag("local")` (7 tests)
+### Local Tier — `@Tag("local")` (8 tests)
 
 | # | Test Class | Needs Docker? | Needs GCP? | What It Tests |
 |---|-----------|:---:|:---:|--------------|
@@ -73,25 +73,26 @@ Some tests don't use either file — they set their own configuration entirely v
 | 5 | `FailOnMissingDemoTest` | No | No | Application startup fails with `SecretNotFoundException` when a required secret is absent |
 | 6 | `CacheRefreshDemoTest` | No | No | `SecretRefreshService.refresh()` and `refreshAll()` invalidate cached entries, statistics are tracked |
 | 7 | `AwsProviderDemoTest` | **Yes** | No | Testcontainers spins up LocalStack, seeds AWS secrets, and verifies `@SecretValue` resolves them |
+| 8 | `VaultProviderDemoTest` | **Yes** | No | Testcontainers spins up Vault dev mode, verifies provider precedence, JSON field extraction, and KV v2 version reads |
 
 ### Cloud Tier — `@Tag("cloud")` (4 tests)
 
 | # | Test Class | Needs Docker? | Needs GCP? | What It Tests |
 |---|-----------|:---:|:---:|--------------|
-| 8 | `GcpProviderDemoTest` | No | **Yes** | Directly calls `GcpSecretProvider` against real GCP Secret Manager |
-| 9 | `GcpJsonFieldDemoTest` | No | **Yes** | JSON field extraction (flat + nested) from real GCP secrets via Spring Boot context |
-| 10 | `GcpAwsFallbackDemoTest` | **Yes** | **Yes** | GCP is tried first (real); if a secret only exists in AWS (LocalStack), fallback works |
-| 11 | `FullStackDemoTest` | **Yes** | **Yes** | All three providers together — GCP (real) + AWS (LocalStack) + Local — with JSON extraction, fallback, defaults, and cache refresh |
+| 9 | `GcpProviderDemoTest` | No | **Yes** | Directly calls `GcpSecretProvider` against real GCP Secret Manager |
+| 10 | `GcpJsonFieldDemoTest` | No | **Yes** | JSON field extraction (flat + nested) from real GCP secrets via Spring Boot context |
+| 11 | `GcpAwsFallbackDemoTest` | **Yes** | **Yes** | GCP is tried first (real); if a secret only exists in AWS (LocalStack), fallback works |
+| 12 | `FullStackDemoTest` | **Yes** | **Yes** | All three providers together — GCP (real) + AWS (LocalStack) + Local — with JSON extraction, fallback, defaults, and cache refresh |
 
 ### Dependency Matrix
 
 ```
                     No Docker     Docker Required
                  ┌─────────────┬──────────────────┐
-  No GCP Creds   │ Tests 1-6   │ Test 7           │
-                 │ (6 tests)   │ (1 test)         │
+  No GCP Creds   │ Tests 1-6   │ Tests 7-8        │
+                 │ (6 tests)   │ (2 tests)        │
                  ├─────────────┼──────────────────┤
-  GCP Creds      │ Tests 8-9   │ Tests 10-11      │
+  GCP Creds      │ Tests 9-10  │ Tests 11-12      │
   Required       │ (2 tests)   │ (2 tests)        │
                  └─────────────┴──────────────────┘
 ```
@@ -102,7 +103,7 @@ Some tests don't use either file — they set their own configuration entirely v
 
 **What you need:** Java 21, Maven. Nothing else.
 
-**What runs:** Tests 1–6 (all local tests except `AwsProviderDemoTest`).
+**What runs:** Tests 1–6 (all local tests except Docker-dependent ones).
 
 These tests use only the local secret provider. All secrets are hardcoded in `@TestPropertySource` annotations or `application-test.yml`. No network calls are made.
 
@@ -181,11 +182,11 @@ fail-on-missing = true
 
 ---
 
-## 4. Level 2 — Local Tests with Docker (LocalStack)
+## 4. Level 2 — Local Tests with Docker (LocalStack + Vault)
 
 **What you need:** Java 21, Maven, Docker running.
 
-**What runs:** All 7 local tests (Tests 1–7), including `AwsProviderDemoTest`.
+**What runs:** All 8 local tests (Tests 1–8), including `AwsProviderDemoTest` and `VaultProviderDemoTest`.
 
 This is the default `make test-local` target.
 
@@ -207,9 +208,9 @@ make test-local
 # Equivalent to: mvn test -Plocal-tests
 ```
 
-### What the extra test proves
+### What the Docker-based tests prove
 
-**AwsProviderDemoTest** — this is the only local test that needs Docker. Here's what happens step by step:
+**AwsProviderDemoTest** — spins up LocalStack and verifies AWS secret resolution end to end:
 
 ```
 1. @Container annotation tells Testcontainers to start LocalStack 4.12.0
@@ -229,14 +230,23 @@ make test-local
 8. Testcontainers shuts down LocalStack after tests complete
 ```
 
-You do **NOT** need to run `docker compose up` or `make docker-up`. Testcontainers manages the container lifecycle automatically.
+**VaultProviderDemoTest** — spins up Vault dev mode and verifies:
+
+```
+1. Vault provider can resolve secrets from a containerized dev server
+2. JSON field extraction works for Vault values
+3. KV v2 version reads work (explicit version lookup)
+4. Fallback to local works when a key doesn't exist in Vault
+```
+
+You do **NOT** need to run `docker compose up` or `make docker-up` for these tests. Testcontainers manages container lifecycle automatically.
 
 ### If Docker is not available
 
-If Docker isn't running, `AwsProviderDemoTest` will fail. The other 6 local tests will still pass. To skip the Docker-dependent test:
+If Docker isn't running, Docker-dependent tests will fail. The other 6 local tests still pass. To skip Docker-dependent tests:
 
 ```bash
-mvn test -Plocal-tests -Dtest="!AwsProviderDemoTest"
+mvn test -Plocal-tests -Dtest="!AwsProviderDemoTest,!VaultProviderDemoTest"
 ```
 
 ---
@@ -245,7 +255,7 @@ mvn test -Plocal-tests -Dtest="!AwsProviderDemoTest"
 
 **What you need:** Java 21, Maven, GCP credentials configured (see `docs/GCP_SETUP_GUIDE.md`).
 
-**What runs:** Tests 8–9 (`GcpProviderDemoTest`, `GcpJsonFieldDemoTest`).
+**What runs:** Tests 9–10 (`GcpProviderDemoTest`, `GcpJsonFieldDemoTest`).
 
 These two cloud tests only talk to real GCP — no Docker needed.
 
@@ -304,7 +314,7 @@ GCP: "nested-config"  = {"database":{"connection":{"host":"db.example.com","pass
 
 **What you need:** Java 21, Maven, Docker running, GCP credentials configured.
 
-**What runs:** Tests 10–11 (`GcpAwsFallbackDemoTest`, `FullStackDemoTest`).
+**What runs:** Tests 11–12 (`GcpAwsFallbackDemoTest`, `FullStackDemoTest`).
 
 These tests combine real GCP with LocalStack to validate cross-provider behavior.
 
@@ -364,7 +374,7 @@ It also tests that `SecretRefreshService` is wired and functional.
 
 **What you need:** Java 21, Maven, Docker running, GCP credentials configured.
 
-**What runs:** All 11 tests.
+**What runs:** All 12 tests.
 
 ### Prerequisites
 
@@ -393,6 +403,7 @@ Maven runs both `@Tag("local")` and `@Tag("cloud")` tests in a single pass:
 [INFO] Running io.github.timhwang777.unisecretdemo.local.FailOnMissingDemoTest         ✓ (no deps)
 [INFO] Running io.github.timhwang777.unisecretdemo.local.CacheRefreshDemoTest          ✓ (no deps)
 [INFO] Running io.github.timhwang777.unisecretdemo.local.AwsProviderDemoTest           ✓ (Docker)
+[INFO] Running io.github.timhwang777.unisecretdemo.local.VaultProviderDemoTest         ✓ (Docker)
 [INFO] Running io.github.timhwang777.unisecretdemo.cloud.GcpProviderDemoTest           ✓ (GCP)
 [INFO] Running io.github.timhwang777.unisecretdemo.cloud.GcpJsonFieldDemoTest          ✓ (GCP)
 [INFO] Running io.github.timhwang777.unisecretdemo.cloud.GcpAwsFallbackDemoTest        ✓ (Docker+GCP)
@@ -417,8 +428,8 @@ mvn test -Dtest="ClassName#methodName" -Dgroups=""
 # Run multiple specific test classes
 mvn test -Dtest="ClassA,ClassB" -Dgroups=""
 
-# Exclude a test class
-mvn test -Plocal-tests -Dtest="!AwsProviderDemoTest"
+# Exclude Docker-dependent local tests
+mvn test -Plocal-tests -Dtest="!AwsProviderDemoTest,!VaultProviderDemoTest"
 ```
 
 ### Examples
@@ -430,6 +441,9 @@ mvn test -Dtest="JsonFieldExtractionDemoTest" -Dgroups=""
 # Just the AWS LocalStack test (needs Docker)
 mvn test -Dtest="AwsProviderDemoTest" -Dgroups=""
 
+# Just the Vault provider test (needs Docker)
+mvn test -Dtest="VaultProviderDemoTest" -Dgroups=""
+
 # Just the full stack cloud test (needs Docker + GCP)
 export GCP_PROJECT_ID=your-project-id
 mvn test -Dtest="FullStackDemoTest" -Dgroups=""
@@ -439,7 +453,7 @@ export GCP_PROJECT_ID=your-project-id
 mvn test -Dtest="GcpProviderDemoTest,GcpJsonFieldDemoTest" -Dgroups=""
 
 # Run all local tests EXCEPT the Docker-dependent one
-mvn test -Plocal-tests -Dtest="!AwsProviderDemoTest"
+mvn test -Plocal-tests -Dtest="!AwsProviderDemoTest,!VaultProviderDemoTest"
 ```
 
 ---
@@ -587,10 +601,10 @@ Merged config
 
 | I have... | Command | Tests that run |
 |-----------|---------|---------------|
-| Java + Maven only | `mvn test -Plocal-tests -Dtest='!AwsProviderDemoTest'` | 1–6 (6 tests) |
-| Java + Maven + Docker | `make test-local` | 1–7 (7 tests) |
-| Java + Maven + GCP creds | `export GCP_PROJECT_ID=... && mvn test -Pcloud-tests -Dtest='GcpProviderDemoTest,GcpJsonFieldDemoTest'` | 8–9 (2 tests) |
-| Java + Maven + Docker + GCP creds | `export GCP_PROJECT_ID=... && make test-all` | 1–11 (11 tests) |
+| Java + Maven only | `mvn test -Plocal-tests -Dtest='!AwsProviderDemoTest,!VaultProviderDemoTest'` | 1–6 (6 tests) |
+| Java + Maven + Docker | `make test-local` | 1–8 (8 tests) |
+| Java + Maven + GCP creds | `export GCP_PROJECT_ID=... && mvn test -Pcloud-tests -Dtest='GcpProviderDemoTest,GcpJsonFieldDemoTest'` | 9–10 (2 tests) |
+| Java + Maven + Docker + GCP creds | `export GCP_PROJECT_ID=... && make test-all` | 1–12 (12 tests) |
 
 ### "I want to run the app. What do I type?"
 
@@ -598,12 +612,14 @@ Merged config
 |------------|---------|-------------|
 | Dev (offline) | `make run-dev` | Nothing |
 | Staging (mixed) | `make docker-up && export GCP_PROJECT_ID=... && make run-staging` | Docker + GCP |
+| Vault demo (local) | `make run-vault` | Docker |
 
 ### "Something failed. What do I check?"
 
 | Error | Likely cause | Fix |
 |-------|-------------|-----|
 | `AwsProviderDemoTest` fails | Docker not running | Start Docker Desktop |
+| `VaultProviderDemoTest` fails | Docker not running or port `8200` blocked | Start Docker Desktop, free port `8200` |
 | Cloud tests skipped | `GCP_PROJECT_ID` not set | `export GCP_PROJECT_ID=...` |
 | `SecretNotFoundException` in cloud tests | GCP secrets not seeded | `make gcp-setup` or `./scripts/setup-gcp-secrets.sh your-project-id` |
 | `IOException: Application Default Credentials are not available` | ADC not configured | `gcloud auth application-default login` |
