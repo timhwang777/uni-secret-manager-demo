@@ -14,7 +14,7 @@ The app exposes REST endpoints that show secret-resolution status without exposi
 - `@SecretValue` injection for plain strings and JSON fields
 - Nested JSON extraction via dot-notation paths
 - Default values when secrets are missing
-- Provider ordering and fallback (`gcp -> aws -> local`)
+- Provider ordering and fallback (`gcp -> aws -> local`, `vault -> aws -> local`)
 - Cache invalidation with `SecretRefreshService` and REST endpoints
 - Real GCP integration tests plus Docker-based AWS/Vault tests with Testcontainers
 
@@ -40,7 +40,8 @@ The app exposes REST endpoints that show secret-resolution status without exposi
 │   ├── application-dev.yml
 │   ├── application-staging.yml
 │   ├── application-prod.yml
-│   └── application-vault.yml
+│   ├── application-vault.yml
+│   └── application-staging-vault.yml
 ├── src/test/java/io/github/timhwang777/unisecretdemo
 │   ├── local/
 │   └── cloud/
@@ -107,6 +108,14 @@ export GCP_PROJECT_ID=atsquareone
 make run-staging
 ```
 
+### Staging-Vault profile (Vault + LocalStack AWS + local fallback)
+
+Requires Docker only (no GCP credentials). `make run-staging-vault` starts both Vault and LocalStack, seeds demo secrets, then boots Spring.
+
+```bash
+make run-staging-vault
+```
+
 ### Vault profile (Vault dev container + local fallback)
 
 Requires Docker. `make run-vault` will start Vault dev mode, seed demo secrets, then boot Spring with `vault` profile.
@@ -132,6 +141,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=prod
 | `dev` | `local` | `false` | All secrets come from `application-dev.yml` |
 | `staging` | `gcp, aws, local` | `true` | AWS endpoint points to LocalStack (`http://localhost:4566`) |
 | `vault` | `vault, local` | `false` | Vault points to local dev container (`http://localhost:8200`) |
+| `staging-vault` | `vault, aws, local` | `true` | Vault + LocalStack AWS + local fallback (Docker only) |
 | `prod` | `gcp, aws` | `true` | Local provider disabled |
 
 Base config in `application.yml` enables secret caching and retry settings shared by all profiles.
@@ -170,11 +180,12 @@ Base config in `application.yml` enables secret caching and retry settings share
 ## Secret Injection Examples in Code
 
 - `DatabaseService`: JSON fields from `db-credentials`
-- `ExternalApiService`: provider override (`provider="gcp"`)
+- `ExternalApiService`: profile-driven API key resolution using the active provider order
 - `FeatureFlagService`: default value (`defaultValue="disabled"`)
 - `MultiCloudService`: custom chain (`providers={"gcp","aws"}`)
 - `VersionedSecretService`: versioned lookup (`version="latest"`)
 - `NestedConfigService`: nested dot-path extraction (for example `database.connection.password`)
+- `VaultMultiProviderService`: Vault provider override (`provider="vault"`) and Vault→AWS chain (`providers={"vault","aws"}`)
 
 ## API Endpoints
 
@@ -273,6 +284,7 @@ Local tag (`@Tag("local")`):
 - `CacheRefreshDemoTest`
 - `AwsProviderDemoTest` (Docker/Testcontainers required)
 - `VaultProviderDemoTest` (Docker/Testcontainers required)
+- `VaultAwsFallbackDemoTest` (Docker/Testcontainers required — Vault + LocalStack)
 
 Cloud tag (`@Tag("cloud")`):
 

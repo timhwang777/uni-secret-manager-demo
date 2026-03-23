@@ -5,13 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Demonstrates single provider override — forces GCP as the sole provider.
+ * Demonstrates resolving an API key through the active profile's provider order.
  */
 @Slf4j
 @Service
 public class ExternalApiService {
 
-    @SecretValue(value = "gcp-api-key", provider = "gcp")
+    @SecretValue(value = "gcp-api-key")
     private String apiKey;
 
     public boolean isConfigured() {

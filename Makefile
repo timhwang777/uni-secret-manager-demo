@@ -1,4 +1,4 @@
-.PHONY: install-starter build check-gcp check-docker check-localstack check-vault test-offline test-local test-gcp test-cloud test-all run-dev run-staging run-vault docker-up docker-up-vault docker-down gcp-setup gcp-cleanup
+.PHONY: install-starter build check-gcp check-docker check-localstack check-vault test-offline test-local test-gcp test-cloud test-all run-dev run-staging run-staging-vault run-vault docker-up docker-up-vault docker-down gcp-setup gcp-cleanup
 
 # Install the uni-secret-manager-spring starter to local Maven repository (~/.m2)
 # Prerequisite: Clone the starter repo as a sibling directory
@@ -66,25 +66,25 @@ check-vault: check-docker
 test-offline:
 	mvn test -Plocal-tests -Dtest="LocalProviderDemoTest,FallbackChainDemoTest,JsonFieldExtractionDemoTest,DefaultValueDemoTest,FailOnMissingDemoTest,CacheRefreshDemoTest"
 
-# Level 2: Local tests with Docker (Tests 1-8)
+# Level 2: Local tests with Docker (Tests 1-9)
 # Requirements: Java 21 + Maven + Docker
-# Includes AwsProviderDemoTest and VaultProviderDemoTest (both use Testcontainers)
+# Includes AwsProviderDemoTest, VaultProviderDemoTest, and VaultAwsFallbackDemoTest (all use Testcontainers)
 test-local: check-docker
 	mvn test -Plocal-tests
 
-# Level 3: Cloud tests - GCP only (Tests 9-10)
+# Level 3: Cloud tests - GCP only (Tests 10-11)
 # Requirements: Java 21 + Maven + GCP credentials
 # No Docker needed - tests real GCP Secret Manager directly
 test-gcp: check-gcp
 	mvn test -Pcloud-tests -Dtest="GcpProviderDemoTest,GcpJsonFieldDemoTest"
 
-# Level 4: Cloud tests with Docker (Tests 11-12)
+# Level 4: Cloud tests with Docker (Tests 12-13)
 # Requirements: Java 21 + Maven + Docker + GCP credentials
 # Tests cross-provider fallback between real GCP and LocalStack AWS
 test-cloud: check-gcp check-docker
 	mvn test -Pcloud-tests -Dtest="GcpAwsFallbackDemoTest,FullStackDemoTest"
 
-# Level 5: Full test suite (Tests 1-12)
+# Level 5: Full test suite (Tests 1-13)
 # Requirements: Java 21 + Maven + Docker + GCP credentials
 # Runs all local and cloud tests
 test-all: check-gcp check-docker
@@ -106,6 +106,13 @@ run-dev:
 # Note: Run "make docker-down" when done to stop LocalStack
 run-staging: check-gcp check-localstack
 	AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test mvn spring-boot:run -Dspring-boot.run.profiles=staging
+
+# Run with staging-vault profile (Vault + LocalStack AWS + local fallback)
+# Requirements: Docker only (no GCP credentials needed)
+# Automatically starts/seeds Vault and LocalStack before running
+# Note: Run "make docker-down" when done to stop containers
+run-staging-vault: check-vault check-localstack
+	AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test VAULT_TOKEN=dev-only-token mvn spring-boot:run -Dspring-boot.run.profiles=staging-vault
 
 # Run with vault profile (Vault dev container + local fallback)
 # Requirements: Docker

@@ -21,6 +21,7 @@ public class DemoController {
     private final MultiCloudService multiCloudService;
     private final VersionedSecretService versionedSecretService;
     private final NestedConfigService nestedConfigService;
+    private final VaultMultiProviderService vaultMultiProviderService;
 
     @GetMapping("/db-status")
     public ResponseEntity<Map<String, Object>> getDbStatus() {
@@ -65,6 +66,11 @@ public class DemoController {
         result.put("nestedConfig", Map.of(
                 "configured", nestedConfigService.isConfigured(),
                 "summary", nestedConfigService.getSummary()
+        ));
+        result.put("vaultMultiProvider", Map.of(
+                "configured", vaultMultiProviderService.isConfigured(),
+                "vaultApiKey", vaultMultiProviderService.getVaultApiKeyStatus(),
+                "sharedSecret", vaultMultiProviderService.getSharedSecretSource()
         ));
 
         return ResponseEntity.ok(result);
