@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Verifies AWS Secrets Manager integration via LocalStack + Testcontainers.
  */
 @Tag("local")
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = {AwsProviderDemoTest.AwsTestBean.class, SecretManagerAutoConfiguration.class})
 class AwsProviderDemoTest {
 

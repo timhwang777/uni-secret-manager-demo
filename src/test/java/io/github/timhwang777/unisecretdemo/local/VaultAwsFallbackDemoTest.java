@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Exercises provider precedence, cross-provider fallback, and default values.
  */
 @Tag("local")
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = {
         VaultAwsFallbackDemoTest.FallbackTestBean.class,
         SecretManagerAutoConfiguration.class,

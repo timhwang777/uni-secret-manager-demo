@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Covers provider precedence, JSON field extraction, KV v2 version reads, and local fallback.
  */
 @Tag("local")
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(classes = {
         VaultProviderDemoTest.VaultTestBean.class,
         SecretManagerAutoConfiguration.class,

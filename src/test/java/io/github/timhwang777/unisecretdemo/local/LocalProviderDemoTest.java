@@ -1,10 +1,10 @@
 package io.github.timhwang777.unisecretdemo.local;
 
-import io.github.timhwang777.unisecretdemo.UniSecretManagerDemoApplication;
 import io.github.timhwang777.unisecretdemo.service.DatabaseService;
 import io.github.timhwang777.unisecretdemo.service.FeatureFlagService;
 import io.github.timhwang777.unisecretdemo.service.NestedConfigService;
 import io.github.timhwang777.unisecretdemo.service.VersionedSecretService;
+import io.github.timhwang777.unisecret.config.SecretManagerAutoConfiguration;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +17,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Verifies secrets resolve correctly from the local provider.
  */
 @Tag("local")
-@SpringBootTest(classes = UniSecretManagerDemoApplication.class)
+@SpringBootTest(classes = {
+        DatabaseService.class,
+        FeatureFlagService.class,
+        VersionedSecretService.class,
+        NestedConfigService.class,
+        SecretManagerAutoConfiguration.class
+})
 @ActiveProfiles("test")
 class LocalProviderDemoTest {
 
