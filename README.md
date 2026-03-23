@@ -65,29 +65,23 @@ The app exposes REST endpoints that show secret-resolution status without exposi
 
 ## Setup
 
-### 1) Install the starter artifact to local Maven cache
+### 1) Build the demo
 
-This project depends on `io.github.timhwang777:uni-secret-manager-spring-boot-starter:1.0.0-SNAPSHOT`.
+The starter dependency (`uni-secret-manager-spring-boot-starter`) is resolved automatically from [JitPack](https://jitpack.io) — no extra setup needed:
 
-Use the provided Make target:
+```bash
+make build
+```
+
+### Local development (optional)
+
+If you're actively developing the starter alongside this demo, you can install it to your local Maven cache instead:
 
 ```bash
 make install-starter
 ```
 
-If your local starter repo is at `../uni-secret-manager-spring`, this equivalent command works directly:
-
-```bash
-mvn -f ../uni-secret-manager-spring/pom.xml install -DskipTests -Djacoco.skip=true
-```
-
-If your starter repo path is different, run the same Maven install command against that repo's `pom.xml`.
-
-### 2) Build the demo
-
-```bash
-make build
-```
+This builds the starter from `../uni-secret-manager-spring` and installs it to `~/.m2`. The local artifact takes priority over JitPack.
 
 ## Running the App
 
@@ -348,4 +342,4 @@ gcloud auth application-default login
   - Run `gcloud auth application-default login`
   - Verify IAM roles for Secret Manager access
 - Missing starter dependency during build
-  - Ensure the starter artifact is installed locally (`make install-starter`)
+  - The starter is resolved from JitPack automatically. If JitPack is unavailable, install locally with `make install-starter`

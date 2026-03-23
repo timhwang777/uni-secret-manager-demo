@@ -1,12 +1,11 @@
-# Migration Guide: Local Development to Remote GitHub Packages
+# Migration Guide: Local Development to Remote Packages
 
-This guide covers how to set up the `uni-secret-manager-spring-boot-starter` plugin for **local development**, and then how to **migrate to consuming it from GitHub Packages** when you're ready.
+This guide covers how to set up the `uni-secret-manager-spring-boot-starter` plugin for **local development**, and then how to **migrate to consuming it from a remote repository** when you're ready.
 
 ## Prerequisites
 
 - Java 21
 - Maven 3.8+
-- A GitHub account with access to the private plugin repository
 
 ## Part 1: Local Development Setup
 
@@ -30,16 +29,52 @@ mvn clean install
 
 Maven resolves the dependency from `~/.m2` automatically. No `<repositories>` block or credentials needed.
 
-> **Tip:** Make sure both projects use the same version (`1.0.0-SNAPSHOT`). If you bump the version in the plugin, update the demo's `pom.xml` to match.
+> **Tip:** Make sure both projects use the same version. If you bump the version in the plugin, update the demo's `pom.xml` to match.
 
 ### When to use local setup
 
 - You're actively developing or debugging the plugin alongside the demo
 - You want fast iteration without publishing to a remote registry
 
-## Part 2: Migrating to Remote GitHub Packages
+## Part 2: Using JitPack (Recommended)
 
-Once the plugin is published to GitHub Packages, you can switch the demo to pull it remotely instead of relying on a local build.
+The demo is pre-configured to resolve the starter from [JitPack](https://jitpack.io). No authentication or extra setup is needed.
+
+The `pom.xml` already includes:
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+```
+
+JitPack builds the starter directly from the GitHub repository. The version in `pom.xml` uses `main-SNAPSHOT` to track the latest `main` branch.
+
+### Verify remote resolution
+
+Delete the locally cached artifact to ensure Maven pulls from JitPack:
+
+```bash
+rm -rf ~/.m2/repository/io/github/timhwang777/uni-secret-manager-spring-boot-starter
+mvn clean compile
+```
+
+You should see Maven downloading from `https://jitpack.io/...` in the output.
+
+### JitPack version formats
+
+| Version | Resolves to |
+|---|---|
+| `main-SNAPSHOT` | Latest commit on `main` branch |
+| `v1.0.0` | Git tag `v1.0.0` |
+| `abc1234` | Specific commit hash |
+
+## Part 3: Alternative - GitHub Packages
+
+If you prefer GitHub Packages over JitPack, you can switch the repository configuration. Note that GitHub Packages **requires authentication** even for public packages.
 
 ### Step 1: Create a GitHub Personal Access Token (PAT)
 
@@ -71,9 +106,9 @@ Replace `YOUR_GITHUB_USERNAME` and `YOUR_GITHUB_PAT` with your actual values.
 
 > **Important:** The `<id>github</id>` must match the repository `<id>` in the next step. Never commit this file to version control.
 
-### Step 3: Add the GitHub Packages repository to `pom.xml`
+### Step 3: Replace the JitPack repository in `pom.xml`
 
-Add this block to the demo project's `pom.xml`:
+Replace the JitPack `<repositories>` block with:
 
 ```xml
 <repositories>
@@ -86,20 +121,18 @@ Add this block to the demo project's `pom.xml`:
 
 ### Step 4: Verify remote resolution
 
-Delete the locally cached artifact to ensure Maven pulls from GitHub Packages:
-
 ```bash
 rm -rf ~/.m2/repository/io/github/timhwang777/uni-secret-manager-spring-boot-starter
-mvn clean install
+mvn clean compile
 ```
 
 You should see Maven downloading from `https://maven.pkg.github.com/...` in the output.
 
-## Part 3: CI/CD with GitHub Actions
+## Part 4: CI/CD with GitHub Actions
 
-For CI environments, configure credentials using environment variables.
+### Using JitPack (no extra config needed)
 
-### Option A: Using `actions/setup-java` (recommended)
+JitPack requires no authentication, so your CI workflow just works:
 
 ```yaml
 - uses: actions/setup-java@v4
@@ -108,11 +141,12 @@ For CI environments, configure credentials using environment variables.
     distribution: 'temurin'
 
 - name: Build
-  run: mvn clean install -s $GITHUB_WORKSPACE/.github/maven-settings.xml
-  env:
-    GITHUB_ACTOR: ${{ github.actor }}
-    GITHUB_TOKEN: ${{ secrets.READ_PACKAGES_PAT }}
+  run: mvn clean compile
 ```
+
+### Using GitHub Packages
+
+For CI environments, store a PAT with `read:packages` scope as a repository secret (e.g., `READ_PACKAGES_PAT`).
 
 Create `.github/maven-settings.xml` in the demo repo:
 
@@ -126,6 +160,19 @@ Create `.github/maven-settings.xml` in the demo repo:
     </server>
   </servers>
 </settings>
+```
+
+```yaml
+- uses: actions/setup-java@v4
+  with:
+    java-version: '21'
+    distribution: 'temurin'
+
+- name: Build
+  run: mvn clean install -s $GITHUB_WORKSPACE/.github/maven-settings.xml
+  env:
+    GITHUB_ACTOR: ${{ github.actor }}
+    GITHUB_TOKEN: ${{ secrets.READ_PACKAGES_PAT }}
 ```
 
 > **Note:** Since the plugin repository is **private**, the default `GITHUB_TOKEN` may not have permission to read packages from another repo. Use a PAT with `read:packages` scope stored as a repository secret (e.g., `READ_PACKAGES_PAT`).
